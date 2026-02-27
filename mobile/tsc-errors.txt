@@ -1,0 +1,39 @@
+﻿components/ui/collapsible.tsx(7,10): error TS2724: '"@/constants/theme"' has no exported member named 'Colors'. Did you mean 'COLORS'?
+components/ui/collapsible.tsx(7,24): error TS1149: File name 'C:/Users/yash/OneDrive/Desktop/EmergencyNLH/mobile/constants/theme.ts' differs from already included file name 'C:/Users/yash/OneDrive/Desktop/EmergencyNLH/mobile/constants/Theme.ts' only in casing.
+  The file is in the program because:
+    Matched by include pattern '**/*.ts' in 'C:/Users/yash/OneDrive/Desktop/EmergencyNLH/mobile/tsconfig.json'
+    Imported via '@/constants/theme' from file 'C:/Users/yash/OneDrive/Desktop/EmergencyNLH/mobile/hooks/use-theme-color.ts'
+    Imported via '@/constants/Theme' from file 'C:/Users/yash/OneDrive/Desktop/EmergencyNLH/mobile/components/ui/ToastContainer.tsx'
+    Imported via '@/constants/Theme' from file 'C:/Users/yash/OneDrive/Desktop/EmergencyNLH/mobile/app/index.tsx'
+    Imported via '@/constants/Theme' from file 'C:/Users/yash/OneDrive/Desktop/EmergencyNLH/mobile/app/admin/index.tsx'
+    Imported via '@/constants/Theme' from file 'C:/Users/yash/OneDrive/Desktop/EmergencyNLH/mobile/components/ui/SeverityBadge.tsx'
+    Imported via '@/constants/Theme' from file 'C:/Users/yash/OneDrive/Desktop/EmergencyNLH/mobile/app/citizen/emergency-form.tsx'
+    Imported via '@/constants/Theme' from file 'C:/Users/yash/OneDrive/Desktop/EmergencyNLH/mobile/components/ui/LoadingSpinner.tsx'
+    Imported via '@/constants/Theme' from file 'C:/Users/yash/OneDrive/Desktop/EmergencyNLH/mobile/app/citizen/index.tsx'
+    Imported via '@/constants/Theme' from file 'C:/Users/yash/OneDrive/Desktop/EmergencyNLH/mobile/app/citizen/tracking.tsx'
+    Imported via '@/constants/Theme' from file 'C:/Users/yash/OneDrive/Desktop/EmergencyNLH/mobile/components/ui/StatusTimeline.tsx'
+    Imported via '@/constants/Theme' from file 'C:/Users/yash/OneDrive/Desktop/EmergencyNLH/mobile/components/ui/ETACountdown.tsx'
+    Imported via '@/constants/Theme' from file 'C:/Users/yash/OneDrive/Desktop/EmergencyNLH/mobile/app/driver/active-emergency.tsx'
+    Imported via '@/constants/Theme' from file 'C:/Users/yash/OneDrive/Desktop/EmergencyNLH/mobile/app/driver/index.tsx'
+    Imported via '@/constants/Theme' from file 'C:/Users/yash/OneDrive/Desktop/EmergencyNLH/mobile/app/hospital/index.tsx'
+    Imported via '@/constants/theme' from file 'C:/Users/yash/OneDrive/Desktop/EmergencyNLH/mobile/components/ui/collapsible.tsx'
+components/ui/ETACountdown.tsx(19,9): error TS2322: Type 'number' is not assignable to type 'Timeout'.
+hooks/use-theme-color.ts(6,10): error TS2724: '"@/constants/theme"' has no exported member named 'Colors'. Did you mean 'COLORS'?
+hooks/use-theme-color.ts(6,24): error TS1149: File name 'C:/Users/yash/OneDrive/Desktop/EmergencyNLH/mobile/constants/theme.ts' differs from already included file name 'C:/Users/yash/OneDrive/Desktop/EmergencyNLH/mobile/constants/Theme.ts' only in casing.
+  The file is in the program because:
+    Matched by include pattern '**/*.ts' in 'C:/Users/yash/OneDrive/Desktop/EmergencyNLH/mobile/tsconfig.json'
+    Imported via '@/constants/theme' from file 'C:/Users/yash/OneDrive/Desktop/EmergencyNLH/mobile/hooks/use-theme-color.ts'
+    Imported via '@/constants/Theme' from file 'C:/Users/yash/OneDrive/Desktop/EmergencyNLH/mobile/components/ui/ToastContainer.tsx'
+    Imported via '@/constants/Theme' from file 'C:/Users/yash/OneDrive/Desktop/EmergencyNLH/mobile/app/index.tsx'
+    Imported via '@/constants/Theme' from file 'C:/Users/yash/OneDrive/Desktop/EmergencyNLH/mobile/app/admin/index.tsx'
+    Imported via '@/constants/Theme' from file 'C:/Users/yash/OneDrive/Desktop/EmergencyNLH/mobile/components/ui/SeverityBadge.tsx'
+    Imported via '@/constants/Theme' from file 'C:/Users/yash/OneDrive/Desktop/EmergencyNLH/mobile/app/citizen/emergency-form.tsx'
+    Imported via '@/constants/Theme' from file 'C:/Users/yash/OneDrive/Desktop/EmergencyNLH/mobile/components/ui/LoadingSpinner.tsx'
+    Imported via '@/constants/Theme' from file 'C:/Users/yash/OneDrive/Desktop/EmergencyNLH/mobile/app/citizen/index.tsx'
+    Imported via '@/constants/Theme' from file 'C:/Users/yash/OneDrive/Desktop/EmergencyNLH/mobile/app/citizen/tracking.tsx'
+    Imported via '@/constants/Theme' from file 'C:/Users/yash/OneDrive/Desktop/EmergencyNLH/mobile/components/ui/StatusTimeline.tsx'
+    Imported via '@/constants/Theme' from file 'C:/Users/yash/OneDrive/Desktop/EmergencyNLH/mobile/components/ui/ETACountdown.tsx'
+    Imported via '@/constants/Theme' from file 'C:/Users/yash/OneDrive/Desktop/EmergencyNLH/mobile/app/driver/active-emergency.tsx'
+    Imported via '@/constants/Theme' from file 'C:/Users/yash/OneDrive/Desktop/EmergencyNLH/mobile/app/driver/index.tsx'
+    Imported via '@/constants/Theme' from file 'C:/Users/yash/OneDrive/Desktop/EmergencyNLH/mobile/app/hospital/index.tsx'
+    Imported via '@/constants/theme' from file 'C:/Users/yash/OneDrive/Desktop/EmergencyNLH/mobile/components/ui/collapsible.tsx'
