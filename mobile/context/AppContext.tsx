@@ -41,6 +41,12 @@ export interface Emergency {
   created_at: string;
   citizen_name?: string;
   citizen_phone?: string;
+  age?: number;
+  bloodGroup?: string;
+  conditions?: string[];
+  allergies?: string[];
+  traumaIndex?: number;
+  distance?: number;
 }
 
 export interface AmbulanceLocation {

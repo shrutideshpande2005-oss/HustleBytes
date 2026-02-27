@@ -592,7 +592,7 @@ export default function SignupScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <LinearGradient colors={details.gradient as any} style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => { if (router.canGoBack()) { router.back(); } else { router.replace(`/auth/login?role=${role}` as any); } }} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color="#FFF" />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>

@@ -12,6 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useApp } from '@/context/AppContext';
 import socketService, { SOCKET_EVENTS } from '@/services/socket';
 import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS, SHADOWS, SEVERITY_COLORS } from '@/constants/Theme';
+import MapView, { Marker } from 'react-native-maps';
 import StatusTimeline from '@/components/ui/StatusTimeline';
 import ETACountdown from '@/components/ui/ETACountdown';
 import SeverityBadge from '@/components/ui/SeverityBadge';
@@ -25,22 +26,22 @@ export default function TrackingScreen() {
     useEffect(() => {
         socketService.connect();
 
-        socketService.on(SOCKET_EVENTS.STATUS_UPDATE, (data: any) => {
+        socketService.on(SOCKET_EVENTS.EMERGENCY_STATUS, (data: any) => {
             if (currentEmergency && data.emergency_id === currentEmergency.id) {
                 setCurrentEmergency({ ...currentEmergency, status: data.status });
                 addToast(`Status updated: ${data.status.replace(/_/g, ' ')}`, 'info');
             }
         });
 
-        socketService.on(SOCKET_EVENTS.AMBULANCE_LOCATION_UPDATE, (data: any) => {
+        socketService.on(SOCKET_EVENTS.LOCATION_UPDATE, (data: any) => {
             if (currentEmergency && data.ambulance_id === currentEmergency.ambulance_id) {
                 setAmbulanceLoc({ lat: data.lat, lon: data.lon });
             }
         });
 
         return () => {
-            socketService.off(SOCKET_EVENTS.STATUS_UPDATE);
-            socketService.off(SOCKET_EVENTS.AMBULANCE_LOCATION_UPDATE);
+            socketService.off(SOCKET_EVENTS.EMERGENCY_STATUS);
+            socketService.off(SOCKET_EVENTS.LOCATION_UPDATE);
         };
     }, [currentEmergency]);
 
@@ -106,32 +107,47 @@ export default function TrackingScreen() {
             </LinearGradient>
 
             <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
-                {/* Map Placeholder */}
+                {/* Real-Time Live Map View */}
                 <View style={styles.mapContainer}>
-                    <LinearGradient
-                        colors={['#1E293B', '#334155']}
-                        style={styles.mapPlaceholder}
+                    <MapView
+                        style={styles.mapFrame}
+                        showsUserLocation={true}
+                        initialRegion={{
+                            latitude: currentEmergency.lat,
+                            longitude: currentEmergency.lon,
+                            latitudeDelta: 0.05,
+                            longitudeDelta: 0.05,
+                        }}
                     >
-                        <Ionicons name="map" size={48} color={COLORS.accent} />
-                        <Text style={styles.mapText}>Live Map View</Text>
-                        <View style={styles.mapMarkers}>
-                            <View style={styles.markerRow}>
-                                <View style={[styles.markerDot, { backgroundColor: COLORS.accent }]} />
-                                <Text style={styles.markerLabel}>Your Location</Text>
-                            </View>
-                            <View style={styles.markerRow}>
-                                <View style={[styles.markerDot, { backgroundColor: COLORS.ambulanceYellow }]} />
-                                <Text style={styles.markerLabel}>
-                                    Ambulance {currentEmergency.ambulance_id}
-                                    {ambulanceLoc ? ` (${ambulanceLoc.lat.toFixed(3)}, ${ambulanceLoc.lon.toFixed(3)})` : ''}
-                                </Text>
-                            </View>
-                            <View style={styles.markerRow}>
-                                <View style={[styles.markerDot, { backgroundColor: COLORS.success }]} />
-                                <Text style={styles.markerLabel}>{currentEmergency.hospital_name || 'Assigned Hospital'}</Text>
-                            </View>
-                        </View>
-                    </LinearGradient>
+                        {/* Citizen Marker */}
+                        <Marker
+                            coordinate={{ latitude: currentEmergency.lat, longitude: currentEmergency.lon }}
+                            title="Your Location"
+                            pinColor={COLORS.accent}
+                        />
+
+                        {/* Live Ambulance Marker */}
+                        {ambulanceLoc && (
+                            <Marker
+                                coordinate={{ latitude: ambulanceLoc.lat, longitude: ambulanceLoc.lon }}
+                                title={`Ambulance ${currentEmergency.ambulance_id || ''}`}
+                                pinColor={COLORS.ambulanceYellow || '#F59E0B'}
+                            >
+                                <View style={styles.ambulanceCarBadge}>
+                                    <Ionicons name="medical" size={14} color="#FFF" />
+                                </View>
+                            </Marker>
+                        )}
+
+                        {/* Destination Hospital Marker (Mocked to static for now) */}
+                        {currentEmergency.hospital_name && (
+                            <Marker
+                                coordinate={{ latitude: 28.6139, longitude: 77.2090 }} // Mock AIIMS coords
+                                title={currentEmergency.hospital_name}
+                                pinColor={COLORS.success}
+                            />
+                        )}
+                    </MapView>
                 </View>
 
                 {/* ETA */}
@@ -209,7 +225,9 @@ const styles = StyleSheet.create({
     headerSub: { fontSize: FONT_SIZES.xs, color: 'rgba(255,255,255,0.7)', marginTop: 2 },
     scrollView: { flex: 1 },
     content: { padding: SPACING.lg, gap: SPACING.md },
-    mapContainer: { borderRadius: BORDER_RADIUS.lg, overflow: 'hidden', ...SHADOWS.medium },
+    mapContainer: { borderRadius: BORDER_RADIUS.lg, overflow: 'hidden', height: 250, ...SHADOWS.medium },
+    mapFrame: { width: '100%', height: '100%' },
+    ambulanceCarBadge: { width: 24, height: 24, borderRadius: 12, backgroundColor: COLORS.ambulanceYellow || '#F59E0B', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFF' },
     mapPlaceholder: { height: 200, alignItems: 'center', justifyContent: 'center', padding: SPACING.lg },
     mapText: { fontSize: FONT_SIZES.md, color: COLORS.accentLight, fontWeight: '600', marginTop: SPACING.sm },
     mapMarkers: { marginTop: SPACING.md, gap: SPACING.xs },

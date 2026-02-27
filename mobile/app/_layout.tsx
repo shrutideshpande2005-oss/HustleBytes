@@ -10,6 +10,7 @@ export default function RootLayout() {
     <AppProvider>
       <View style={{ flex: 1 }}>
         <Stack
+          initialRouteName="index"
           screenOptions={{
             headerShown: false,
             animation: 'slide_from_right',

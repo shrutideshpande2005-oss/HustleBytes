@@ -14,6 +14,7 @@ import * as Haptics from 'expo-haptics';
 import { useApp, EmergencyStatus } from '@/context/AppContext';
 import { updateEmergencyStatus } from '@/services/api';
 import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS, SHADOWS } from '@/constants/Theme';
+import MapView, { Marker } from 'react-native-maps';
 import SeverityBadge from '@/components/ui/SeverityBadge';
 import StatusTimeline from '@/components/ui/StatusTimeline';
 
@@ -99,15 +100,36 @@ export default function ActiveEmergencyScreen() {
             </LinearGradient>
 
             <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
-                {/* Map Placeholder */}
+                {/* Live Navigation Map */}
                 <View style={styles.mapContainer}>
-                    <LinearGradient colors={['#1E293B', '#334155']} style={styles.mapPlaceholder}>
-                        <Ionicons name="navigate" size={40} color={COLORS.accent} />
-                        <Text style={styles.mapText}>Navigation Active</Text>
-                        <Text style={styles.mapSub}>
-                            Route to: {currentEmergency.lat.toFixed(4)}, {currentEmergency.lon.toFixed(4)}
-                        </Text>
-                    </LinearGradient>
+                    <MapView
+                        style={styles.mapFrame}
+                        initialRegion={{
+                            latitude: currentEmergency.lat,
+                            longitude: currentEmergency.lon,
+                            latitudeDelta: 0.05,
+                            longitudeDelta: 0.05,
+                        }}
+                    >
+                        {/* Destination Marker */}
+                        <Marker
+                            coordinate={{ latitude: currentEmergency.lat, longitude: currentEmergency.lon }}
+                            title={`Patient: ${currentEmergency.citizen_name || 'Unknown'}`}
+                            description={currentEmergency.description}
+                            pinColor={COLORS.critical}
+                        />
+
+                        {/* Paramedic Origin (Mocked location offset) */}
+                        <Marker
+                            coordinate={{ latitude: currentEmergency.lat + 0.02, longitude: currentEmergency.lon + 0.02 }}
+                            title="Your Ambulance"
+                            pinColor={COLORS.ambulanceYellow || '#F59E0B'}
+                        >
+                            <View style={styles.ambulanceCarBadge}>
+                                <Ionicons name="car-sport" size={14} color="#FFF" />
+                            </View>
+                        </Marker>
+                    </MapView>
                 </View>
 
                 {/* Patient Details */}
@@ -229,7 +251,9 @@ const styles = StyleSheet.create({
     headerSub: { fontSize: FONT_SIZES.xs, color: 'rgba(255,255,255,0.7)', marginTop: 2 },
     scrollView: { flex: 1 },
     content: { padding: SPACING.lg, gap: SPACING.md },
-    mapContainer: { borderRadius: BORDER_RADIUS.lg, overflow: 'hidden', ...SHADOWS.medium },
+    mapContainer: { borderRadius: BORDER_RADIUS.lg, overflow: 'hidden', height: 250, ...SHADOWS.medium },
+    mapFrame: { width: '100%', height: '100%' },
+    ambulanceCarBadge: { width: 28, height: 28, borderRadius: 14, backgroundColor: COLORS.ambulanceYellow || '#F59E0B', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFF' },
     mapPlaceholder: { height: 180, alignItems: 'center', justifyContent: 'center', padding: SPACING.lg },
     mapText: { fontSize: FONT_SIZES.lg, color: COLORS.accentLight, fontWeight: '700', marginTop: SPACING.sm },
     mapSub: { fontSize: FONT_SIZES.xs, color: 'rgba(255,255,255,0.6)', marginTop: 4 },

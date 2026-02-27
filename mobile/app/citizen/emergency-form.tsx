@@ -29,7 +29,22 @@ export default function EmergencyForm() {
     const { userLocation, setCurrentEmergency, addToast } = useApp();
     const [description, setDescription] = useState('');
     const [severity, setSeverity] = useState('');
+    const [age, setAge] = useState('');
+    const [bloodGroup, setBloodGroup] = useState('Unknown');
+    const [isRecording, setIsRecording] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+
+    const handleVoiceRecord = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+        setIsRecording(true);
+        addToast('Listening... Speak now.', 'info');
+        // Mock voice to text translation
+        setTimeout(() => {
+            setIsRecording(false);
+            setDescription(prev => prev + (prev ? ' ' : '') + 'Car accident on main street, my chest hurts.');
+            addToast('Audio transcribed.', 'success');
+        }, 3000);
+    };
 
     const handleSubmit = async () => {
         if (!description.trim()) {
@@ -63,6 +78,13 @@ export default function EmergencyForm() {
                 lat: userLocation?.lat || 28.6139,
                 lon: userLocation?.lon || 77.2090,
                 severity: severity as any,
+                age: age ? parseInt(age) : 30,
+                bloodGroup: bloodGroup,
+                conditions: [],
+                allergies: [],
+                traumaIndex: severity === 'critical' ? 9.5 : (severity === 'high' ? 7.0 : 4.0),
+                distance: 3.5,
+                citizen_name: 'Rahul (Citizen App User)',
                 status: 'assigned' as const,
                 ambulance_id: 'AMB-' + Math.floor(Math.random() * 100).toString().padStart(3, '0'),
                 hospital_id: 'HOSP-001',
@@ -95,11 +117,21 @@ export default function EmergencyForm() {
             </LinearGradient>
 
             <ScrollView style={styles.scrollView} contentContainerStyle={styles.form}>
-                {/* Description */}
-                <Text style={styles.label}>What's happening?</Text>
+                {/* Description & Voice Input */}
+                <View style={[styles.headerRow, { justifyContent: 'space-between', alignItems: 'center' }]}>
+                    <Text style={styles.label}>What's happening?</Text>
+                    <TouchableOpacity
+                        onPress={handleVoiceRecord}
+                        style={[styles.voiceBtn, isRecording && styles.voiceBtnActive]}
+                    >
+                        <Ionicons name={isRecording ? "mic" : "mic-outline"} size={16} color={isRecording ? "#FFF" : COLORS.accent} />
+                        <Text style={[styles.voiceText, isRecording && { color: "#FFF" }]}>{isRecording ? 'Listening...' : 'Voice Triage'}</Text>
+                    </TouchableOpacity>
+                </View>
+
                 <TextInput
                     style={styles.textArea}
-                    placeholder="Describe the emergency situation in detail..."
+                    placeholder="Describe the emergency situation in detail or tap Voice Triage..."
                     placeholderTextColor={COLORS.textMuted}
                     multiline
                     numberOfLines={4}
@@ -107,6 +139,30 @@ export default function EmergencyForm() {
                     onChangeText={setDescription}
                     textAlignVertical="top"
                 />
+
+                {/* Pre-Arrival Medical Tags (Fast) */}
+                <Text style={styles.label}>Patient Fast Data (Optional)</Text>
+                <View style={styles.fastDataGrid}>
+                    <TextInput
+                        style={styles.fastInput}
+                        placeholder="Age"
+                        placeholderTextColor={COLORS.textMuted}
+                        keyboardType="number-pad"
+                        value={age}
+                        onChangeText={setAge}
+                    />
+                    <View style={styles.bloodRadioBlock}>
+                        {['A+', 'B+', 'O+', 'O-'].map(bg => (
+                            <TouchableOpacity
+                                key={bg}
+                                style={[styles.bloodRadio, bloodGroup === bg && styles.bloodRadioActive]}
+                                onPress={() => setBloodGroup(bg)}
+                            >
+                                <Text style={[styles.bloodRadioText, bloodGroup === bg && styles.bloodRadioTextActive]}>{bg}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </View>
 
                 {/* Severity */}
                 <Text style={styles.label}>Severity Level</Text>
@@ -228,6 +284,17 @@ const styles = StyleSheet.create({
     severityGrid: {
         gap: SPACING.sm,
     },
+    headerRow: { flexDirection: 'row' },
+    voiceBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.accent + '20', paddingHorizontal: 10, paddingVertical: 4, borderRadius: BORDER_RADIUS.full, gap: 4 },
+    voiceBtnActive: { backgroundColor: COLORS.critical },
+    voiceText: { fontSize: FONT_SIZES.xs, fontWeight: '700', color: COLORS.accent },
+    fastDataGrid: { flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.md },
+    fastInput: { backgroundColor: COLORS.surface, flex: 0.3, borderRadius: BORDER_RADIUS.md, borderWidth: 1, borderColor: COLORS.border, padding: SPACING.sm, fontSize: FONT_SIZES.sm, color: COLORS.textPrimary, textAlign: 'center' },
+    bloodRadioBlock: { flex: 0.7, flexDirection: 'row', gap: 6, alignItems: 'center' },
+    bloodRadio: { backgroundColor: COLORS.surface, flex: 1, borderRadius: BORDER_RADIUS.sm, borderWidth: 1, borderColor: COLORS.border, alignItems: 'center', paddingVertical: 10 },
+    bloodRadioActive: { backgroundColor: COLORS.criticalBg, borderColor: COLORS.critical },
+    bloodRadioText: { fontSize: FONT_SIZES.xs, fontWeight: '700', color: COLORS.textMuted },
+    bloodRadioTextActive: { color: COLORS.critical },
     severityCard: {
         backgroundColor: COLORS.surface,
         borderRadius: BORDER_RADIUS.md,
