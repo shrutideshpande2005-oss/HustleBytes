@@ -4,11 +4,21 @@ const socketService = {
   connect: () => {
     console.log("Mock socket connected");
   },
+
   disconnect: () => {
     console.log("Mock socket disconnected");
   },
+
   emit: (event: string, data: any) => {
     console.log("Mock socket emit:", event, data);
+  },
+
+  on: (event: string, callback: Function) => {
+    console.log("Mock socket listening to:", event);
+  },
+
+  off: (event: string, callback?: Function) => {
+    console.log("Mock socket stopped listening to:", event);
   },
 };
 
