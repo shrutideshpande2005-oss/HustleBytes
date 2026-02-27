@@ -25,7 +25,8 @@ export type EmergencyStatus =
   | "picked_patient"
   | "en_route_hospital"
   | "reached_hospital"
-  | "completed";
+  | "completed"
+  | "volunteer_arrived";
 
 export interface Emergency {
   id: string;

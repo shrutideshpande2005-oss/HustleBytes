@@ -1,5 +1,5 @@
-export const API_BASE_URL = "http://192.168.1.5:8000";
-// Replace with your laptop IP if needed
+export const API_BASE_URL = "http://172.20.10.7:5000/api/emergency";
+// Pointing to your live backend server
 
 export const createEmergency = async (data: any) => {
   try {

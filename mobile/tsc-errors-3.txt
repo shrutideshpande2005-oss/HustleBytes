@@ -1,0 +1,6 @@
+app/volunteer/index.tsx(15,32): error TS2307: Cannot find module 'expo-notifications' or its corresponding type declarations.
+app/volunteer/index.tsx(254,39): error TS2820: Type '"radar-outline"' is not assignable to type '"text" | "warning" | "search" | "repeat" | "link" | "at" | "push" | "map" | "filter" | "body" | "code" | "menu" | "time" | "ellipse" | "image" | "stop" | "checkmark-circle" | "close-circle" | ... 1339 more ... | undefined'. Did you mean '"reader-outline"'?
+app/volunteer/tracking.tsx(27,28): error TS2345: Argument of type '"/volunteer"' is not assignable to parameter of type '"/citizen" | "/driver" | "/hospital" | "/admin" | RelativePathString | ExternalPathString | "/" | `/?${string}` | `/#${string}` | "/volunteer/index" | ... 45 more ... | { ...; }'.
+app/volunteer/tracking.tsx(81,56): error TS2322: Type '"volunteer_arrived"' is not assignable to type 'EmergencyStatus'.
+app/volunteer/tracking.tsx(92,28): error TS2345: Argument of type '"/volunteer"' is not assignable to parameter of type '"/citizen" | "/driver" | "/hospital" | "/admin" | RelativePathString | ExternalPathString | "/" | `/?${string}` | `/#${string}` | "/volunteer/index" | ... 45 more ... | { ...; }'.
+app/volunteer/tracking.tsx(194,22): error TS2367: This comparison appears to be unintentional because the types 'EmergencyStatus' and '"volunteer_arrived"' have no overlap.

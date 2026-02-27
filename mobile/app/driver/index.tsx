@@ -22,9 +22,9 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 const MOCK_EMERGENCIES: Emergency[] = [
     {
         id: 'EMG-001',
-        description: 'Road accident on NH-44, two people injured. Need immediate assistance.',
-        lat: 28.6229,
-        lon: 77.2195,
+        description: 'Road accident on Karve Road, two people injured. Need immediate assistance.',
+        lat: 18.5020,
+        lon: 73.8260,
         severity: 'critical',
         status: 'pending',
         created_at: new Date(Date.now() - 120000).toISOString(),
@@ -33,9 +33,9 @@ const MOCK_EMERGENCIES: Emergency[] = [
     },
     {
         id: 'EMG-002',
-        description: 'Elderly person collapsed at Connaught Place metro station.',
-        lat: 28.6315,
-        lon: 77.2167,
+        description: 'Elderly person collapsed near Pune University.',
+        lat: 18.5360,
+        lon: 73.8180,
         severity: 'high',
         status: 'pending',
         created_at: new Date(Date.now() - 300000).toISOString(),
@@ -44,9 +44,9 @@ const MOCK_EMERGENCIES: Emergency[] = [
     },
     {
         id: 'EMG-003',
-        description: 'Minor burn injury from kitchen accident.',
-        lat: 28.6139,
-        lon: 77.2090,
+        description: 'Minor burn injury from kitchen accident in Kothrud.',
+        lat: 18.5000,
+        lon: 73.8000,
         severity: 'moderate',
         status: 'pending',
         created_at: new Date(Date.now() - 600000).toISOString(),
@@ -107,9 +107,13 @@ export default function DriverDashboard() {
         setRefreshing(true);
         try {
             const res = await getAssignedEmergencies(userId);
-            setEmergencies(res.data);
+            if (res && res.emergencies) {
+                setEmergencies(res.emergencies);
+            } else {
+                setEmergencies(MOCK_EMERGENCIES);
+            }
         } catch (e) {
-            // Keep mock data
+            setEmergencies(MOCK_EMERGENCIES);
         }
         setRefreshing(false);
     };

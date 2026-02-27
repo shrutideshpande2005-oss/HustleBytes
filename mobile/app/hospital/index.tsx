@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useApp } from '@/context/AppContext';
+import socketService, { SOCKET_EVENTS } from '@/services/socket';
 import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS, SHADOWS } from '@/constants/Theme';
 import SeverityBadge from '@/components/ui/SeverityBadge';
 
@@ -45,38 +46,7 @@ interface IncomingPatient {
 // -------------------------
 // MOCK DATA
 // -------------------------
-const INITIAL_PATIENTS: IncomingPatient[] = [
-    {
-        id: 'EMG-001',
-        description: 'Road accident victim, multiple fractures, internal bleeding suspected',
-        severity: 'critical',
-        status: 'en_route_hospital',
-        ambulance_id: 'AMB-042',
-        eta: 450,
-        citizen_name: 'Rahul Sharma',
-        bloodGroup: 'O+',
-        conditions: ['None'],
-        allergies: ['Penicillin'],
-        age: 34,
-        traumaIndex: 8.5,
-        distance: 4.2
-    },
-    {
-        id: 'EMG-003',
-        description: 'Elderly collapse, possible cardiac event, conscious but weak',
-        severity: 'high',
-        status: 'en_route_hospital',
-        ambulance_id: 'AMB-017',
-        eta: 720,
-        citizen_name: 'Priya Patel',
-        bloodGroup: 'A-',
-        conditions: ['Hypertension', 'Diabetes'],
-        allergies: ['None'],
-        age: 68,
-        traumaIndex: 4.0,
-        distance: 7.1
-    },
-];
+const INITIAL_PATIENTS: IncomingPatient[] = [];
 
 const NEARBY_HOSPITALS = [
     { id: 'H1', name: 'Safdarjung Hospital', icuBeds: 2, load: 88, distance: 3.5, accepting: true },
@@ -171,10 +141,94 @@ export default function HospitalIntelligenceDashboard() {
     );
     const projectedOccupancy = predictLoad(currentOccupancy, incomingPatients.length, 1.5);
 
-    // Tick for timers
+    // Tick for timers and WebSocket listeners
     useEffect(() => {
         const interval = setInterval(() => setNow(Date.now()), 1000);
-        return () => clearInterval(interval);
+
+        socketService.connect();
+
+        // 1. Listen for new emergencies getting routed to this hospital
+        socketService.on(SOCKET_EVENTS.NEW_EMERGENCY, (data: any) => {
+            if (data.status === 'arrived_at_scene') {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                addToast('🚨 INCOMING TRAUMA PATIENT ROUTED HERE!', 'warning');
+
+                const newPatient: IncomingPatient = {
+                    id: data.id,
+                    description: data.description || 'Incoming Emergency Patient',
+                    severity: data.severity || 'critical',
+                    status: 'en_route_hospital',
+                    ambulance_id: data.ambulance_id || 'AMB-AUTO',
+                    eta: 600, // 10 minutes default
+                    citizen_name: data.citizen_name || 'Unknown Patient',
+                    bloodGroup: 'O+', // Hardcoded for demo
+                    conditions: ['Trauma'],
+                    allergies: ['None'],
+                    age: 45,
+                    traumaIndex: 8.0,
+                    distance: 4.2
+                };
+                setIncomingPatients(prev => [newPatient, ...prev]);
+            }
+        });
+
+        // 2. Listen to live Driver Location to dynamically tick down ETA and Distance!
+        socketService.on(SOCKET_EVENTS.LOCATION_UPDATE, (locData: any) => {
+            setIncomingPatients(prev => prev.map(patient => {
+                if (patient.id === locData.targetId && patient.status !== 'completed') {
+                    // Reduce ETA by 1 sec and distance fractionally to simulate the car driving
+                    const currentDist = patient.distance;
+                    return {
+                        ...patient,
+                        distance: Math.max(0, currentDist - 0.04),
+                        eta: Math.max(0, patient.eta - 2) // decrease ETA twice as fast for visual progress
+                    };
+                }
+                return patient;
+            }));
+        });
+
+        // 3. Listen to driver clicking "Arrived At Hospital"
+        socketService.on(SOCKET_EVENTS.STATUS_UPDATE, (statusData: any) => {
+            if (statusData.status === 'completed') {
+                setIncomingPatients(prev => prev.map(p =>
+                    p.id === statusData.emergencyId ? { ...p, status: 'completed' } : p
+                ));
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                addToast('✅ AMBULANCE ARRIVED AT EMERGENCY BAY', 'success');
+            } else if (statusData.status === 'arrived_at_scene') {
+                // Hotfix: When driver clicks arrived at scene, trigger incoming flow
+                addToast('🚨 INCOMING TRAUMA PATIENT ROUTED HERE!', 'warning');
+
+                const newPatient: IncomingPatient = {
+                    id: statusData.emergencyId,
+                    description: 'Incoming Emergency Patient',
+                    severity: 'critical',
+                    status: 'en_route_hospital',
+                    ambulance_id: 'AMB-AUTO',
+                    eta: 600, // 10 minutes default
+                    citizen_name: 'Unknown Patient',
+                    bloodGroup: 'O+', // Hardcoded for demo
+                    conditions: ['Trauma'],
+                    allergies: ['None'],
+                    age: 45,
+                    traumaIndex: 8.0,
+                    distance: 4.2
+                };
+                setIncomingPatients(prev => {
+                    const exists = prev.find(p => p.id === statusData.emergencyId);
+                    if (!exists) return [newPatient, ...prev];
+                    return prev;
+                });
+            }
+        });
+
+        return () => {
+            clearInterval(interval);
+            socketService.off(SOCKET_EVENTS.NEW_EMERGENCY);
+            socketService.off(SOCKET_EVENTS.LOCATION_UPDATE);
+            socketService.off(SOCKET_EVENTS.STATUS_UPDATE);
+        };
     }, []);
 
     const toggleSurgeMode = (val: boolean) => {

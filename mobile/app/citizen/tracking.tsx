@@ -26,54 +26,32 @@ export default function TrackingScreen() {
     useEffect(() => {
         socketService.connect();
 
-        socketService.on(SOCKET_EVENTS.EMERGENCY_STATUS, (data: any) => {
-            if (currentEmergency && data.emergency_id === currentEmergency.id) {
-                setCurrentEmergency({ ...currentEmergency, status: data.status });
+        socketService.on(SOCKET_EVENTS.STATUS_UPDATE, (data: any) => {
+            const emergencyId = currentEmergency?.id || (currentEmergency as any)?._id;
+            if (currentEmergency && data.emergencyId === emergencyId) {
+                setCurrentEmergency({
+                    ...currentEmergency,
+                    status: data.status,
+                    // If an ambulance was assigned, update it dynamically on the Citizen's screen!
+                    ...(data.ambulance_id && { ambulance_id: data.ambulance_id })
+                });
                 addToast(`Status updated: ${data.status.replace(/_/g, ' ')}`, 'info');
             }
         });
 
         socketService.on(SOCKET_EVENTS.LOCATION_UPDATE, (data: any) => {
-            if (currentEmergency && data.ambulance_id === currentEmergency.ambulance_id) {
+            if (currentEmergency && data.driverId === currentEmergency.ambulance_id) {
                 setAmbulanceLoc({ lat: data.lat, lon: data.lon });
             }
         });
 
         return () => {
-            socketService.off(SOCKET_EVENTS.EMERGENCY_STATUS);
+            socketService.off(SOCKET_EVENTS.STATUS_UPDATE);
             socketService.off(SOCKET_EVENTS.LOCATION_UPDATE);
         };
     }, [currentEmergency]);
 
-    // Simulate status progression for demo
-    useEffect(() => {
-        if (!currentEmergency) return;
-
-        const statuses: EmergencyStatus[] = [
-            'assigned',
-            'accepted',
-            'arrived_at_scene',
-            'picked_patient',
-            'en_route_hospital',
-            'reached_hospital',
-            'completed',
-        ];
-
-        let currentIndex = statuses.indexOf(currentEmergency.status);
-
-        const interval = setInterval(() => {
-            currentIndex++;
-            if (currentIndex < statuses.length) {
-                const newStatus = statuses[currentIndex];
-                setCurrentEmergency({ ...currentEmergency, status: newStatus });
-                addToast(`Status: ${newStatus.replace(/_/g, ' ').toUpperCase()}`, 'info');
-            } else {
-                clearInterval(interval);
-            }
-        }, 15000); // Every 15 seconds for demo
-
-        return () => clearInterval(interval);
-    }, []);
+    // (Removed the fake 15-second demo interval! Now fully driven by WebSockets from the Driver App updates)
 
     if (!currentEmergency) {
         return (
@@ -153,6 +131,34 @@ export default function TrackingScreen() {
                 {/* ETA */}
                 {currentEmergency.eta && currentEmergency.status !== 'completed' && (
                     <ETACountdown etaSeconds={currentEmergency.eta} />
+                )}
+
+                {/* Driver Info Card (Only shows when ambulance is assigned) */}
+                {currentEmergency.ambulance_id && currentEmergency.status !== 'completed' && (
+                    <View style={styles.driverCard}>
+                        <View style={styles.driverHeader}>
+                            <View style={styles.driverAvatar}>
+                                <Ionicons name="person" size={24} color={COLORS.primary} />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.driverName}>Rajesh Kumar</Text>
+                                <Text style={styles.driverSub}>Paramedic Driver • MH-12-AB-1234</Text>
+                            </View>
+                            <View style={styles.ratingBadge}>
+                                <Ionicons name="star" size={12} color="#F59E0B" />
+                                <Text style={styles.ratingText}>4.9</Text>
+                            </View>
+                        </View>
+                        <View style={styles.driverActions}>
+                            <TouchableOpacity style={styles.callBtn}>
+                                <Ionicons name="call" size={20} color="#FFF" />
+                                <Text style={styles.callBtnText}>Call Driver</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.msgBtn}>
+                                <Ionicons name="chatbubble" size={20} color={COLORS.primary} />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
                 )}
 
                 {/* Details Card */}
@@ -241,6 +247,20 @@ const styles = StyleSheet.create({
     detailValue: { flex: 1, fontSize: FONT_SIZES.sm, color: COLORS.textPrimary, fontWeight: '500', textAlign: 'right' },
     divider: { height: 1, backgroundColor: COLORS.borderLight, marginVertical: SPACING.xs },
     timelineCard: { backgroundColor: COLORS.surface, borderRadius: BORDER_RADIUS.lg, padding: SPACING.lg, borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.small },
+
+    // Driver Card Styles
+    driverCard: { backgroundColor: COLORS.surface, borderRadius: BORDER_RADIUS.lg, padding: SPACING.lg, borderWidth: 1, borderColor: COLORS.primary + '40', ...SHADOWS.small },
+    driverHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.md },
+    driverAvatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: COLORS.primary + '20', alignItems: 'center', justifyContent: 'center', marginRight: SPACING.md },
+    driverName: { fontSize: FONT_SIZES.md, fontWeight: '800', color: COLORS.textPrimary },
+    driverSub: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, marginTop: 2 },
+    ratingBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 12, gap: 2 },
+    ratingText: { fontSize: 10, fontWeight: '800', color: '#D97706' },
+    driverActions: { flexDirection: 'row', gap: SPACING.sm },
+    callBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.primary, paddingVertical: 12, borderRadius: BORDER_RADIUS.md, gap: 8 },
+    callBtnText: { color: '#FFF', fontWeight: '700', fontSize: FONT_SIZES.sm },
+    msgBtn: { width: 44, height: 44, borderRadius: BORDER_RADIUS.md, backgroundColor: COLORS.primary + '15', alignItems: 'center', justifyContent: 'center' },
+
     completedCard: { backgroundColor: COLORS.lowBg, borderRadius: BORDER_RADIUS.lg, padding: SPACING.xl, alignItems: 'center', borderWidth: 1, borderColor: '#BBF7D0' },
     completedTitle: { fontSize: FONT_SIZES.xl, fontWeight: '800', color: COLORS.success, marginTop: SPACING.md },
     completedSub: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, marginTop: SPACING.xs },

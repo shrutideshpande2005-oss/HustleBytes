@@ -47,10 +47,6 @@ export default function EmergencyForm() {
     };
 
     const handleSubmit = async () => {
-        if (!description.trim()) {
-            addToast('Please describe the emergency', 'warning');
-            return;
-        }
         if (!severity) {
             addToast('Please select severity level', 'warning');
             return;
@@ -62,39 +58,20 @@ export default function EmergencyForm() {
         try {
             const response = await createEmergency({
                 description: description.trim(),
-                lat: userLocation?.lat || 28.6139,
-                lon: userLocation?.lon || 77.2090,
+                lat: userLocation?.lat || 18.5204, // Pune fallback
+                lon: userLocation?.lon || 73.8567,
                 severity,
             });
 
-            setCurrentEmergency(response.data);
-            addToast('Emergency reported! Help is on the way.', 'success');
-            router.replace('/citizen/tracking');
+            if (response && response.success) {
+                setCurrentEmergency(response.emergency);
+                addToast('Emergency reported! Help is on the way.', 'success');
+                router.replace('/citizen/tracking');
+            } else {
+                addToast('Error saving emergency to database', 'error');
+            }
         } catch (error: any) {
-            // For demo: simulate a successful response
-            const mockEmergency = {
-                id: 'EMG-' + Date.now().toString().slice(-6),
-                description: description.trim(),
-                lat: userLocation?.lat || 28.6139,
-                lon: userLocation?.lon || 77.2090,
-                severity: severity as any,
-                age: age ? parseInt(age) : 30,
-                bloodGroup: bloodGroup,
-                conditions: [],
-                allergies: [],
-                traumaIndex: severity === 'critical' ? 9.5 : (severity === 'high' ? 7.0 : 4.0),
-                distance: 3.5,
-                citizen_name: 'Rahul (Citizen App User)',
-                status: 'assigned' as const,
-                ambulance_id: 'AMB-' + Math.floor(Math.random() * 100).toString().padStart(3, '0'),
-                hospital_id: 'HOSP-001',
-                hospital_name: 'AIIMS Trauma Centre',
-                eta: 480, // 8 minutes
-                created_at: new Date().toISOString(),
-            };
-            setCurrentEmergency(mockEmergency);
-            addToast('Emergency reported! Help is on the way.', 'success');
-            router.replace('/citizen/tracking');
+            addToast('Network error, please try again.', 'error');
         } finally {
             setSubmitting(false);
         }
@@ -201,9 +178,9 @@ export default function EmergencyForm() {
 
                 {/* Submit */}
                 <TouchableOpacity
-                    style={[styles.submitBtn, (!description || !severity) && styles.submitBtnDisabled]}
+                    style={[styles.submitBtn, (!severity) && styles.submitBtnDisabled]}
                     onPress={handleSubmit}
-                    disabled={submitting || !description || !severity}
+                    disabled={submitting || !severity}
                     activeOpacity={0.85}
                 >
                     {submitting ? (

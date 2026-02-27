@@ -100,8 +100,12 @@ export default function ActiveEmergencyScreen() {
             </LinearGradient>
 
             <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
-                {/* Live Navigation Map */}
-                <View style={styles.mapContainer}>
+                {/* Live Navigation Map Preview */}
+                <TouchableOpacity
+                    style={styles.mapContainer}
+                    activeOpacity={0.9}
+                    onPress={() => router.push('/driver/tracking' as any)}
+                >
                     <MapView
                         style={styles.mapFrame}
                         initialRegion={{
@@ -110,12 +114,13 @@ export default function ActiveEmergencyScreen() {
                             latitudeDelta: 0.05,
                             longitudeDelta: 0.05,
                         }}
+                        pointerEvents="none"
+                        scrollEnabled={false}
                     >
                         {/* Destination Marker */}
                         <Marker
                             coordinate={{ latitude: currentEmergency.lat, longitude: currentEmergency.lon }}
                             title={`Patient: ${currentEmergency.citizen_name || 'Unknown'}`}
-                            description={currentEmergency.description}
                             pinColor={COLORS.critical}
                         />
 
@@ -130,7 +135,15 @@ export default function ActiveEmergencyScreen() {
                             </View>
                         </Marker>
                     </MapView>
-                </View>
+
+                    <View style={styles.openMapOverlay}>
+                        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.8)']} style={StyleSheet.absoluteFill} />
+                        <View style={styles.openMapButton}>
+                            <Ionicons name="map" size={20} color="#FFF" />
+                            <Text style={styles.openMapText}>Open Live AI Routing</Text>
+                        </View>
+                    </View>
+                </TouchableOpacity>
 
                 {/* Patient Details */}
                 <View style={styles.card}>
@@ -275,4 +288,7 @@ const styles = StyleSheet.create({
     statusBtnDone: { backgroundColor: COLORS.lowBg, borderColor: '#BBF7D0' },
     statusBtnText: { flex: 1, fontSize: FONT_SIZES.sm, fontWeight: '600', color: COLORS.textPrimary },
     statusBtnTextDone: { color: COLORS.success },
+    openMapOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
+    openMapButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 16, paddingVertical: 10, borderRadius: BORDER_RADIUS.full, gap: 8 },
+    openMapText: { color: '#FFF', fontWeight: '800', fontSize: FONT_SIZES.sm },
 });

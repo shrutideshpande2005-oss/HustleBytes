@@ -15,10 +15,11 @@ import * as Haptics from 'expo-haptics';
 import { useApp } from '@/context/AppContext';
 import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS, SHADOWS } from '@/constants/Theme';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import { createEmergency } from '@/services/api';
 
 export default function CitizenDashboard() {
     const router = useRouter();
-    const { setUserLocation, addToast } = useApp();
+    const { setUserLocation, addToast, setCurrentEmergency } = useApp();
     const [gettingLocation, setGettingLocation] = useState(false);
 
     // Pulsing animation for emergency button
@@ -90,12 +91,30 @@ export default function CitizenDashboard() {
                 lon: location.coords.longitude,
             });
 
-            addToast('Location detected! Fill in emergency details.', 'success');
-            router.push('/citizen/emergency-form');
+            addToast('Location detected! Dispatching Emergency Services...', 'success');
+
+            // 🔥 NEW: Instant Create Emergency flow API
+            const response = await createEmergency({
+                description: '🚨 INSTANT SOS TRIGGERED BY CITIZEN APP 🚨',
+                lat: location.coords.latitude,
+                lon: location.coords.longitude,
+                severity: 'critical',
+            });
+
+            if (response && response.success) {
+                // Save context and redirect directly to Tracking Map!
+                setCurrentEmergency(response.emergency);
+                addToast('Emergency Services Dispatched.', 'success');
+                router.push('/citizen/tracking');
+            } else {
+                addToast('Network error dispatching SOS, switching to form.', 'warning');
+                router.push('/citizen/emergency-form');
+            }
+
         } catch (error) {
-            addToast('Could not get location. Please try again.', 'error');
+            addToast('Could not get precise location. Routing to Manual Form.', 'warning');
             // Fallback: use a default location for demo
-            setUserLocation({ lat: 28.6139, lon: 77.2090 }); // Delhi
+            setUserLocation({ lat: 18.5204, lon: 73.8567 }); // Pune Fallback
             router.push('/citizen/emergency-form');
         } finally {
             setGettingLocation(false);
@@ -104,7 +123,7 @@ export default function CitizenDashboard() {
 
     const handleReportEmergency = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        handleEmergencyPress();
+        router.push('/citizen/emergency-form');
     };
 
     return (

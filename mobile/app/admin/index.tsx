@@ -16,26 +16,27 @@ import { useApp, Emergency } from '@/context/AppContext';
 import socketService, { SOCKET_EVENTS } from '@/services/socket';
 import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS, SHADOWS, SEVERITY_COLORS } from '@/constants/Theme';
 import SeverityBadge from '@/components/ui/SeverityBadge';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 
 const { width } = Dimensions.get('window');
 
-// Mock data
+// Mock data (Updated to Pune Coordinates as requested)
 const MOCK_EMERGENCIES: Emergency[] = [
-    { id: 'EMG-001', description: 'Road accident NH-44', lat: 28.6229, lon: 77.2195, severity: 'critical', status: 'en_route_hospital', ambulance_id: 'AMB-042', hospital_name: 'AIIMS', created_at: new Date(Date.now() - 120000).toISOString() },
-    { id: 'EMG-002', description: 'Cardiac arrest elderly person', lat: 28.6315, lon: 77.2167, severity: 'high', status: 'picked_patient', ambulance_id: 'AMB-017', hospital_name: 'Safdarjung', created_at: new Date(Date.now() - 300000).toISOString() },
-    { id: 'EMG-003', description: 'Building fire, 3 injured', lat: 28.6500, lon: 77.2300, severity: 'critical', status: 'assigned', ambulance_id: 'AMB-089', hospital_name: 'RML Hospital', created_at: new Date(Date.now() - 60000).toISOString() },
-    { id: 'EMG-004', description: 'Minor fall injury at metro', lat: 28.6139, lon: 77.2090, severity: 'low', status: 'completed', ambulance_id: 'AMB-005', hospital_name: 'GTB Hospital', created_at: new Date(Date.now() - 1800000).toISOString() },
-    { id: 'EMG-005', description: 'Snake bite, rural area', lat: 28.6400, lon: 77.2100, severity: 'high', status: 'accepted', ambulance_id: 'AMB-033', hospital_name: 'LNJP Hospital', created_at: new Date(Date.now() - 180000).toISOString() },
-    { id: 'EMG-006', description: 'Breathing difficulty, possible COVID', lat: 28.6200, lon: 77.2400, severity: 'moderate', status: 'pending', created_at: new Date(Date.now() - 30000).toISOString() },
+    { id: 'EMG-001', description: 'Road accident NH-48', lat: 18.5204, lon: 73.8567, severity: 'critical', status: 'en_route_hospital', ambulance_id: 'AMB-042', hospital_name: 'Sassoon Hospital', created_at: new Date(Date.now() - 120000).toISOString() },
+    { id: 'EMG-002', description: 'Cardiac arrest elderly person', lat: 18.5315, lon: 73.8467, severity: 'high', status: 'picked_patient', ambulance_id: 'AMB-017', hospital_name: 'Ruby Hall', created_at: new Date(Date.now() - 300000).toISOString() },
+    { id: 'EMG-003', description: 'Building fire, 3 injured', lat: 18.5500, lon: 73.8300, severity: 'critical', status: 'assigned', ambulance_id: 'AMB-089', hospital_name: 'Jehangir Hospital', created_at: new Date(Date.now() - 60000).toISOString() },
+    { id: 'EMG-004', description: 'Minor fall injury at station', lat: 18.5139, lon: 73.8090, severity: 'low', status: 'completed', ambulance_id: 'AMB-005', hospital_name: 'Deenanath M.', created_at: new Date(Date.now() - 1800000).toISOString() },
+    { id: 'EMG-005', description: 'Industrial accident', lat: 18.5400, lon: 73.8100, severity: 'high', status: 'accepted', ambulance_id: 'AMB-033', hospital_name: 'Aditya Birla', created_at: new Date(Date.now() - 180000).toISOString() },
+    { id: 'EMG-006', description: 'Breathing difficulty', lat: 18.5200, lon: 73.8400, severity: 'moderate', status: 'pending', created_at: new Date(Date.now() - 30000).toISOString() },
 ];
 
 const MOCK_AMBULANCES = [
-    { id: 'AMB-005', lat: 28.6139, lon: 77.2090, status: 'available' },
-    { id: 'AMB-017', lat: 28.6350, lon: 77.2200, status: 'busy' },
-    { id: 'AMB-033', lat: 28.6420, lon: 77.2080, status: 'busy' },
-    { id: 'AMB-042', lat: 28.6250, lon: 77.2180, status: 'busy' },
-    { id: 'AMB-089', lat: 28.6480, lon: 77.2320, status: 'busy' },
-    { id: 'AMB-112', lat: 28.6100, lon: 77.2050, status: 'available' },
+    { id: 'AMB-005', lat: 18.5139, lon: 73.8090, status: 'available' },
+    { id: 'AMB-017', lat: 18.5350, lon: 73.8200, status: 'busy' },
+    { id: 'AMB-033', lat: 18.5420, lon: 73.8080, status: 'busy' },
+    { id: 'AMB-042', lat: 18.5250, lon: 73.8180, status: 'busy' },
+    { id: 'AMB-089', lat: 18.5480, lon: 73.8320, status: 'busy' },
+    { id: 'AMB-112', lat: 18.5100, lon: 73.8050, status: 'available' },
 ];
 
 const MOCK_HOSPITALS = [
@@ -50,6 +51,7 @@ export default function AdminDashboard() {
     const router = useRouter();
     const { surgeMode, setSurgeMode, addToast } = useApp();
     const [emergencies, setEmergencies] = useState(MOCK_EMERGENCIES);
+    const [ambulances, setAmbulances] = useState(MOCK_AMBULANCES);
     const [refreshing, setRefreshing] = useState(false);
     const [activeTab, setActiveTab] = useState<'overview' | 'emergencies' | 'resources'>('overview');
     const surgeAnim = useRef(new Animated.Value(0)).current;
@@ -91,15 +93,28 @@ export default function AdminDashboard() {
             );
         });
 
+        // Listen for live location updates from ambulances!
+        socketService.on(SOCKET_EVENTS.LOCATION_UPDATE, (data: any) => {
+            setAmbulances((prev) =>
+                prev.map((amb) =>
+                    // If driverId matches our ambulance ID, update its live map coordinates
+                    amb.id === data.driverId
+                        ? { ...amb, lat: data.lat, lon: data.lon, status: 'busy' }
+                        : amb
+                )
+            );
+        });
+
         return () => {
             socketService.off(SOCKET_EVENTS.NEW_EMERGENCY);
             socketService.off(SOCKET_EVENTS.STATUS_UPDATE);
+            socketService.off(SOCKET_EVENTS.LOCATION_UPDATE);
         };
     }, []);
 
     const activeEmergencies = emergencies.filter((e) => e.status !== 'completed');
     const criticalCount = emergencies.filter((e) => e.severity === 'critical' && e.status !== 'completed').length;
-    const availableAmbulances = MOCK_AMBULANCES.filter((a) => a.status === 'available').length;
+    const availableAmbulances = ambulances.filter((a) => a.status === 'available').length;
 
     const getStatusColor = (status: string) => {
         if (status === 'completed') return COLORS.success;
@@ -149,7 +164,7 @@ export default function AdminDashboard() {
                     <Text style={styles.statLabel}>Critical</Text>
                 </View>
                 <View style={[styles.statCard, { borderLeftColor: COLORS.accent }]}>
-                    <Text style={[styles.statValue, { color: COLORS.accent }]}>{MOCK_AMBULANCES.length}</Text>
+                    <Text style={[styles.statValue, { color: COLORS.accent }]}>{ambulances.length}</Text>
                     <Text style={styles.statLabel}>Ambulances</Text>
                 </View>
                 <View style={[styles.statCard, { borderLeftColor: COLORS.success }]}>
@@ -180,26 +195,55 @@ export default function AdminDashboard() {
             >
                 {activeTab === 'overview' && (
                     <>
-                        {/* Map Placeholder */}
+                        {/* Live Map of All Resources */}
                         <View style={styles.mapContainer}>
-                            <LinearGradient colors={['#1E293B', '#334155']} style={styles.mapPlaceholder}>
-                                <Ionicons name="globe" size={40} color={COLORS.accent} />
-                                <Text style={styles.mapText}>Live Operations Map</Text>
-                                <View style={styles.mapLegend}>
-                                    <View style={styles.legendItem}>
-                                        <View style={[styles.legendDot, { backgroundColor: COLORS.critical }]} />
-                                        <Text style={styles.legendText}>Emergencies ({activeEmergencies.length})</Text>
-                                    </View>
-                                    <View style={styles.legendItem}>
-                                        <View style={[styles.legendDot, { backgroundColor: COLORS.ambulanceYellow }]} />
-                                        <Text style={styles.legendText}>Ambulances ({MOCK_AMBULANCES.length})</Text>
-                                    </View>
-                                    <View style={styles.legendItem}>
-                                        <View style={[styles.legendDot, { backgroundColor: COLORS.hospitalBlue }]} />
-                                        <Text style={styles.legendText}>Hospitals ({MOCK_HOSPITALS.length})</Text>
-                                    </View>
+                            <MapView
+                                style={styles.mapFrame}
+                                provider={PROVIDER_GOOGLE}
+                                initialRegion={{
+                                    latitude: 18.5204,
+                                    longitude: 73.8567, // Pune City Coordinates
+                                    latitudeDelta: 0.1,
+                                    longitudeDelta: 0.1,
+                                }}
+                            >
+                                {/* Render active emergencies */}
+                                {activeEmergencies.map((emg) => (
+                                    <Marker
+                                        key={emg.id}
+                                        coordinate={{ latitude: emg.lat, longitude: emg.lon }}
+                                        title={emg.id}
+                                        description={emg.description}
+                                        pinColor={emg.severity === 'critical' ? COLORS.critical : COLORS.high}
+                                    />
+                                ))}
+
+                                {/* Render all live ambulances */}
+                                {ambulances.map((amb) => (
+                                    <Marker
+                                        key={amb.id}
+                                        coordinate={{ latitude: amb.lat, longitude: amb.lon }}
+                                        title={amb.id}
+                                        description={`Status: ${amb.status}`}
+                                    >
+                                        <View style={[styles.ambulanceMarker, amb.status === 'available' ? styles.ambAvailable : styles.ambBusy]}>
+                                            <Ionicons name="car-sport" size={12} color="#FFF" />
+                                        </View>
+                                    </Marker>
+                                ))}
+                            </MapView>
+
+                            {/* Floating Map Legend Overlay */}
+                            <View style={styles.floatingLegend}>
+                                <View style={styles.legendItem}>
+                                    <View style={[styles.legendDot, { backgroundColor: COLORS.critical }]} />
+                                    <Text style={styles.legendText}>Emergencies ({activeEmergencies.length})</Text>
                                 </View>
-                            </LinearGradient>
+                                <View style={styles.legendItem}>
+                                    <View style={[styles.legendDot, { backgroundColor: COLORS.ambulanceYellow }]} />
+                                    <Text style={styles.legendText}>Ambulances ({ambulances.length})</Text>
+                                </View>
+                            </View>
                         </View>
 
                         {/* Recent Activity */}
@@ -251,7 +295,7 @@ export default function AdminDashboard() {
                         {/* Ambulance Fleet */}
                         <Text style={styles.sectionTitle}>Ambulance Fleet</Text>
                         <View style={styles.fleetGrid}>
-                            {MOCK_AMBULANCES.map((a) => (
+                            {ambulances.map((a) => (
                                 <View key={a.id} style={[styles.fleetCard, a.status === 'available' && styles.fleetAvailable]}>
                                     <Ionicons name="car-sport" size={20} color={a.status === 'available' ? COLORS.success : COLORS.high} />
                                     <Text style={styles.fleetId}>{a.id}</Text>
@@ -319,13 +363,15 @@ const styles = StyleSheet.create({
     scrollView: { flex: 1 },
     content: { padding: SPACING.lg, gap: SPACING.md },
     sectionTitle: { fontSize: FONT_SIZES.lg, fontWeight: '700', color: COLORS.textPrimary, marginTop: SPACING.sm },
-    mapContainer: { borderRadius: BORDER_RADIUS.lg, overflow: 'hidden', ...SHADOWS.medium },
-    mapPlaceholder: { height: 200, alignItems: 'center', justifyContent: 'center', padding: SPACING.lg },
-    mapText: { fontSize: FONT_SIZES.md, color: COLORS.accentLight, fontWeight: '600', marginTop: SPACING.sm },
-    mapLegend: { flexDirection: 'row', gap: SPACING.md, marginTop: SPACING.md },
-    legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    legendDot: { width: 8, height: 8, borderRadius: 4 },
-    legendText: { fontSize: FONT_SIZES.xs, color: 'rgba(255,255,255,0.7)' },
+    mapContainer: { borderRadius: BORDER_RADIUS.lg, overflow: 'hidden', height: 260, ...SHADOWS.medium, position: 'relative' },
+    mapFrame: { width: '100%', height: '100%' },
+    ambulanceMarker: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFF' },
+    ambAvailable: { backgroundColor: COLORS.success },
+    ambBusy: { backgroundColor: COLORS.ambulanceYellow || '#F59E0B' },
+    floatingLegend: { position: 'absolute', bottom: 10, right: 10, backgroundColor: 'rgba(30, 41, 59, 0.85)', padding: 10, borderRadius: BORDER_RADIUS.md, gap: 6 },
+    legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    legendDot: { width: 10, height: 10, borderRadius: 5 },
+    legendText: { fontSize: FONT_SIZES.xs, color: '#FFF', fontWeight: '600' },
     activityRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.surface, padding: SPACING.md, borderRadius: BORDER_RADIUS.md, gap: SPACING.sm, borderWidth: 1, borderColor: COLORS.border },
     activityDot: { width: 10, height: 10, borderRadius: 5 },
     activityTitle: { fontSize: FONT_SIZES.sm, fontWeight: '600', color: COLORS.textPrimary },
