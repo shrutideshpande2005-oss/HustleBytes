@@ -9,6 +9,7 @@ import * as Haptics from 'expo-haptics';
 import { useApp } from '@/context/AppContext';
 import socketService, { SOCKET_EVENTS } from '@/services/socket';
 import { API_BASE_URL } from '@/services/api';
+import { PAGE_TRANSLATIONS } from '@/constants/Translations';
 import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS, SHADOWS } from '@/constants/Theme';
 import SeverityBadge from '@/components/ui/SeverityBadge';
 
@@ -24,7 +25,8 @@ const VOLUNTEER_PROFILE = {
 
 export default function VolunteerDashboard() {
     const router = useRouter();
-    const { userId, setCurrentEmergency, addToast } = useApp();
+    const { userId, setCurrentEmergency, addToast, language } = useApp();
+    const t = PAGE_TRANSLATIONS[language] || PAGE_TRANSLATIONS['en'];
 
     const [isAvailable, setIsAvailable] = useState(false);
     const [locationStatus, setLocationStatus] = useState('Fetching live location...');
@@ -146,8 +148,8 @@ export default function VolunteerDashboard() {
                         <Ionicons name="arrow-back" size={24} color="#FFF" />
                     </TouchableOpacity>
                     <View>
-                        <Text style={styles.headerTitle}>Commando Volunteer</Text>
-                        <Text style={styles.headerSub}>PraanSettu Task Force</Text>
+                        <Text style={styles.headerTitle}>{t.volunteerDash}</Text>
+                        <Text style={styles.headerSub}>{t.volunteerSub}</Text>
                     </View>
                 </View>
 

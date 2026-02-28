@@ -89,6 +89,8 @@ interface AppContextType {
   removeToast: (id: string) => void;
   surgeMode: boolean;
   setSurgeMode: (val: boolean) => void;
+  language: string;
+  setLanguage: (lang: string) => void;
 }
 
 const AppContext = createContext<AppContextType>({} as AppContextType);
@@ -108,6 +110,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   } | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [surgeMode, setSurgeMode] = useState(false);
+  const [language, setLanguage] = useState('en');
 
   const addToast = useCallback(
     (message: string, type: ToastMessage["type"]) => {
@@ -140,6 +143,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         removeToast,
         surgeMode,
         setSurgeMode,
+        language,
+        setLanguage,
       }}
     >
       {children}

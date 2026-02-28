@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useApp } from '@/context/AppContext';
+import { PAGE_TRANSLATIONS } from '@/constants/Translations';
 import socketService, { SOCKET_EVENTS } from '@/services/socket';
 import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS, SHADOWS } from '@/constants/Theme';
 import SeverityBadge from '@/components/ui/SeverityBadge';
@@ -121,7 +122,8 @@ function evaluateHospitalCapacity(
 // -------------------------
 export default function HospitalIntelligenceDashboard() {
     const router = useRouter();
-    const { addToast } = useApp();
+    const { addToast, language } = useApp();
+    const t = PAGE_TRANSLATIONS[language] || PAGE_TRANSLATIONS['en'];
 
     const [refreshing, setRefreshing] = useState(false);
     const [surgeMode, setSurgeMode] = useState(false);
@@ -434,8 +436,8 @@ export default function HospitalIntelligenceDashboard() {
                     <Ionicons name="arrow-back" size={24} color="#FFF" />
                 </TouchableOpacity>
                 <View style={{ flex: 1 }}>
-                    <Text style={styles.headerTitle}>Command Center</Text>
-                    <Text style={styles.headerSub}>AIIMS Intelligence System</Text>
+                    <Text style={styles.headerTitle}>{t.hospitalDash}</Text>
+                    <Text style={styles.headerSub}>{t.managePatients}</Text>
                 </View>
                 <View style={styles.surgeToggleContainer}>
                     <Text style={styles.surgeToggleText}>SURGE</Text>

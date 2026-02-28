@@ -1,4 +1,4 @@
-export const API_BASE_URL = "http://172.20.10.7:5000/api/emergency";
+export const API_BASE_URL = "http://10.158.213.125:5000/api/emergency";
 // Pointing to your live backend server
 
 export const createEmergency = async (data: any) => {
@@ -13,7 +13,8 @@ export const createEmergency = async (data: any) => {
 
     return await response.json();
   } catch (error) {
-    console.error("API Error:", error);
+    console.error("API Error in createEmergency:", error);
+    throw error;
   }
 };
 

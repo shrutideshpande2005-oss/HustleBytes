@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useApp, Emergency } from '@/context/AppContext';
+import { PAGE_TRANSLATIONS } from '@/constants/Translations';
 import socketService, { SOCKET_EVENTS } from '@/services/socket';
 import { getAssignedEmergencies, acceptEmergency, rejectEmergency } from '@/services/api';
 import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS, SHADOWS, SEVERITY_COLORS } from '@/constants/Theme';
@@ -57,7 +58,8 @@ const MOCK_EMERGENCIES: Emergency[] = [
 
 export default function DriverDashboard() {
     const router = useRouter();
-    const { setCurrentEmergency, addToast, userId } = useApp();
+    const { setCurrentEmergency, addToast, userId, language } = useApp();
+    const t = PAGE_TRANSLATIONS[language] || PAGE_TRANSLATIONS['en'];
     const [emergencies, setEmergencies] = useState<Emergency[]>(MOCK_EMERGENCIES);
     const [refreshing, setRefreshing] = useState(false);
     const [acceptingId, setAcceptingId] = useState<string | null>(null);
@@ -133,12 +135,12 @@ export default function DriverDashboard() {
                     <Ionicons name="arrow-back" size={24} color="#FFF" />
                 </TouchableOpacity>
                 <View style={{ flex: 1 }}>
-                    <Text style={styles.headerTitle}>Ambulance Dashboard</Text>
-                    <Text style={styles.headerSub}>Driver: {userId}</Text>
+                    <Text style={styles.headerTitle}>{t.driverDash}</Text>
+                    <Text style={styles.headerSub}>{t.driverTitle}: {userId}</Text>
                 </View>
                 <View style={styles.statusPill}>
                     <View style={styles.onlineDot} />
-                    <Text style={styles.statusPillText}>Online</Text>
+                    <Text style={styles.statusPillText}>{t.online}</Text>
                 </View>
             </LinearGradient>
 
@@ -146,19 +148,19 @@ export default function DriverDashboard() {
             <View style={styles.statsBar}>
                 <View style={styles.statItem}>
                     <Text style={styles.statValue}>{emergencies.length}</Text>
-                    <Text style={styles.statLabel}>Pending</Text>
+                    <Text style={styles.statLabel}>{t.pending}</Text>
                 </View>
                 <View style={styles.statDivider} />
                 <View style={styles.statItem}>
                     <Text style={[styles.statValue, { color: COLORS.critical }]}>
                         {emergencies.filter((e) => e.severity === 'critical').length}
                     </Text>
-                    <Text style={styles.statLabel}>Critical</Text>
+                    <Text style={styles.statLabel}>{t.critical}</Text>
                 </View>
                 <View style={styles.statDivider} />
                 <View style={styles.statItem}>
                     <Text style={[styles.statValue, { color: COLORS.success }]}>0</Text>
-                    <Text style={styles.statLabel}>Completed</Text>
+                    <Text style={styles.statLabel}>{t.completed}</Text>
                 </View>
             </View>
 
@@ -173,8 +175,8 @@ export default function DriverDashboard() {
                 {emergencies.length === 0 ? (
                     <View style={styles.emptyState}>
                         <Ionicons name="checkmark-circle-outline" size={64} color={COLORS.textMuted} />
-                        <Text style={styles.emptyTitle}>No pending emergencies</Text>
-                        <Text style={styles.emptySubtitle}>Pull down to refresh</Text>
+                        <Text style={styles.emptyTitle}>{t.noPending}</Text>
+                        <Text style={styles.emptySubtitle}>{t.pullRefresh}</Text>
                     </View>
                 ) : (
                     emergencies.map((emergency) => {
@@ -215,7 +217,7 @@ export default function DriverDashboard() {
                                 <View style={styles.locationRow}>
                                     <Ionicons name="location-outline" size={14} color={COLORS.accent} />
                                     <Text style={styles.locationText}>
-                                        {emergency.lat.toFixed(4)}, {emergency.lon.toFixed(4)} • ~2.3 km away
+                                        {emergency.lat.toFixed(4)}, {emergency.lon.toFixed(4)} • ~2.3 km {t.distance}
                                     </Text>
                                 </View>
 
@@ -226,7 +228,7 @@ export default function DriverDashboard() {
                                         onPress={() => handleReject(emergency.id)}
                                     >
                                         <Ionicons name="close" size={18} color={COLORS.error} />
-                                        <Text style={styles.rejectText}>Reject</Text>
+                                        <Text style={styles.rejectText}>{t.reject}</Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity
                                         style={styles.acceptBtn}
@@ -238,7 +240,7 @@ export default function DriverDashboard() {
                                         ) : (
                                             <>
                                                 <Ionicons name="checkmark" size={18} color="#FFF" />
-                                                <Text style={styles.acceptText}>Accept & Respond</Text>
+                                                <Text style={styles.acceptText}>{t.accept}</Text>
                                             </>
                                         )}
                                     </TouchableOpacity>

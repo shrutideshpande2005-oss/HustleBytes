@@ -12,7 +12,9 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import { useApp, Emergency } from '@/context/AppContext';
+import { PAGE_TRANSLATIONS } from '@/constants/Translations';
 import socketService, { SOCKET_EVENTS } from '@/services/socket';
 import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS, SHADOWS, SEVERITY_COLORS } from '@/constants/Theme';
 import SeverityBadge from '@/components/ui/SeverityBadge';
@@ -49,7 +51,8 @@ const MOCK_HOSPITALS = [
 
 export default function AdminDashboard() {
     const router = useRouter();
-    const { surgeMode, setSurgeMode, addToast } = useApp();
+    const { surgeMode, setSurgeMode, addToast, language } = useApp();
+    const t = PAGE_TRANSLATIONS[language] || PAGE_TRANSLATIONS['en'];
     const [emergencies, setEmergencies] = useState(MOCK_EMERGENCIES);
     const [ambulances, setAmbulances] = useState(MOCK_AMBULANCES);
     const [refreshing, setRefreshing] = useState(false);
@@ -145,8 +148,8 @@ export default function AdminDashboard() {
                     <Ionicons name="arrow-back" size={24} color="#FFF" />
                 </TouchableOpacity>
                 <View style={{ flex: 1 }}>
-                    <Text style={styles.headerTitle}>Command Center</Text>
-                    <Text style={styles.headerSub}>Admin Dashboard</Text>
+                    <Text style={styles.headerTitle}>{t.adminSub}</Text>
+                    <Text style={styles.headerSub}>{t.adminDash}</Text>
                 </View>
                 <TouchableOpacity style={styles.refreshBtn} onPress={() => addToast('Data refreshed', 'info')}>
                     <Ionicons name="refresh" size={20} color="#FFF" />

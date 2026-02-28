@@ -94,16 +94,44 @@ export default function EmergencyForm() {
             </LinearGradient>
 
             <ScrollView style={styles.scrollView} contentContainerStyle={styles.form}>
-                {/* Description & Voice Input */}
+
+                {/* AI VOICE TRANCRIPTION BLOCK */}
+                <TouchableOpacity
+                    style={[{ backgroundColor: '#EFF6FF', borderColor: '#BFDBFE', borderWidth: 1, padding: 16, borderRadius: 12, marginBottom: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }]}
+                    onPress={() => {
+                        setIsRecording(true);
+                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+                        // Stage 1: Listening
+                        setTimeout(() => {
+                            addToast("🔊 AI Analyzing voice tone and keywords...", "info");
+                        }, 1000);
+
+                        // Stage 2: Analysis Complete & Dispatch
+                        setTimeout(() => {
+                            setIsRecording(false);
+                            addToast("🧠 Panic Level: HIGH | Keywords: 'Heart attack'. Auto-assigning CRITICAL severity.", "error"); // Red warning toast
+
+                            setDescription('🎙️ [AI TRANSCRIPTION]: "My father is having sudden chest pain and breathing issues! Send an ambulance!"');
+                            setSeverity('critical');
+                        }, 4000); // Hackathon Mock 4 seconds transcription
+                    }}
+                    activeOpacity={0.85}
+                >
+                    <Ionicons name={isRecording ? "mic" : "mic-outline"} size={22} color="#3B82F6" />
+                    <Text style={{ color: '#1E3A8A', fontSize: 16, fontWeight: 'bold', marginLeft: 8 }}>{isRecording ? "Listening to your voice..." : "AI Voice Transcription"}</Text>
+                    {isRecording && <LoadingSpinner size={20} color="#3B82F6" />}
+                </TouchableOpacity>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
+                    <View style={{ flex: 1, height: 1, backgroundColor: COLORS.border }} />
+                    <Text style={{ color: COLORS.textMuted, marginHorizontal: 10, fontSize: 12 }}>OR REPORT MANUALLY FOR LOWER PRIORITY RISKS</Text>
+                    <View style={{ flex: 1, height: 1, backgroundColor: COLORS.border }} />
+                </View>
+
+                {/* Description Input */}
                 <View style={[styles.headerRow, { justifyContent: 'space-between', alignItems: 'center' }]}>
                     <Text style={styles.label}>What's happening?</Text>
-                    <TouchableOpacity
-                        onPress={handleVoiceRecord}
-                        style={[styles.voiceBtn, isRecording && styles.voiceBtnActive]}
-                    >
-                        <Ionicons name={isRecording ? "mic" : "mic-outline"} size={16} color={isRecording ? "#FFF" : COLORS.accent} />
-                        <Text style={[styles.voiceText, isRecording && { color: "#FFF" }]}>{isRecording ? 'Listening...' : 'Voice Triage'}</Text>
-                    </TouchableOpacity>
                 </View>
 
                 <TextInput
