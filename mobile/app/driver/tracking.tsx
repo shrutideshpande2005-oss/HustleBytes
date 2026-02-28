@@ -78,9 +78,9 @@ export default function DriverTracking() {
                         return prev;
                     }
 
-                    // Move aggressively closer by 4% every interval
-                    const newLat = prev.lat + (latDiff * 0.04);
-                    const newLon = prev.lon + (lonDiff * 0.04);
+                    // Move aggressively closer by 12% every interval for the Hackathon Demo
+                    const newLat = prev.lat + (latDiff * 0.12);
+                    const newLon = prev.lon + (lonDiff * 0.12);
                     const newCoords = { lat: newLat, lon: newLon };
 
                     // Broadcast movement to Global Admin map instantly

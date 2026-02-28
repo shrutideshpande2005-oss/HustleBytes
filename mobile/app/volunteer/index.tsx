@@ -1,294 +1,310 @@
 import React, { useEffect, useState, useRef } from 'react';
-import {
-    View,
-    Text,
-    StyleSheet,
-    TouchableOpacity,
-    Switch,
-    FlatList,
-    Alert,
-    AppState,
-    Platform
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated, Switch, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
-import * as Location from 'expo-location';
-
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Location from 'expo-location';
 import * as Haptics from 'expo-haptics';
 
 import { useApp } from '@/context/AppContext';
 import socketService, { SOCKET_EVENTS } from '@/services/socket';
-import { acceptEmergency, rejectEmergency } from '@/services/api';
+import { API_BASE_URL } from '@/services/api';
 import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS, SHADOWS } from '@/constants/Theme';
 import SeverityBadge from '@/components/ui/SeverityBadge';
-import LoadingSpinner from '@/components/ui/LoadingSpinner';
+
+const { width } = Dimensions.get('window');
+
+// Mock User Data for Hackathon
+const VOLUNTEER_PROFILE = {
+    name: 'Dr. Suresh Kumar',
+    bloodGroup: 'O+',
+    occupation: 'Medical Student',
+    phone: '+91 9876543210'
+};
 
 export default function VolunteerDashboard() {
     const router = useRouter();
     const { userId, setCurrentEmergency, addToast } = useApp();
 
     const [isAvailable, setIsAvailable] = useState(false);
-    const [emergencies, setEmergencies] = useState<any[]>([]);
-    const [processingId, setProcessingId] = useState<string | null>(null);
+    const [locationStatus, setLocationStatus] = useState('Fetching live location...');
+    const [userLocation, setUserLocation] = useState<{ lat: number, lon: number } | null>(null);
+    const [nearbyEmergencies, setNearbyEmergencies] = useState<any[]>([]);
+    const [activeEmergency, setActiveEmergency] = useState<any | null>(null);
 
-    const appState = useRef(AppState.currentState);
-    const locationSubscription = useRef<Location.LocationSubscription | null>(null);
+    const pulseAnim = useRef(new Animated.Value(1)).current;
 
-    // ---------------------------------------------------------------------------
-    // 1. LIFECYCLE & STATE MANAGEMENT
-    // ---------------------------------------------------------------------------
     useEffect(() => {
-        setupPermissions();
+        setupLocation();
+        fetchNearbyEmergencies();
 
-        // Foreground/Background Handling
-        const subscription = AppState.addEventListener('change', nextAppState => {
-            if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
-                // App has come to the foreground
-                socketService.connect();
-                // Optionally refetch missed emergencies via REST API here
-            }
-            appState.current = nextAppState;
+        socketService.connect();
+
+        socketService.on('VOLUNTEER_ALERT', (data: any) => {
+            // New Emergency within 3KM matched by MongoDB 2dsphere!
+            addToast('🚨 EMERGENCY MATCH: Within 3km!', 'error');
+            setNearbyEmergencies(prev => [data.emergency, ...prev].filter((e, idx, arr) => arr.findIndex(x => x._id === e._id) === idx));
         });
 
-        // Socket Event Listeners
-        socketService.on(SOCKET_EVENTS.NEW_EMERGENCY, handleIncomingEmergency);
+        Animated.loop(
+            Animated.sequence([
+                Animated.timing(pulseAnim, { toValue: 1.2, duration: 1000, useNativeDriver: true }),
+                Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true })
+            ])
+        ).start();
 
         return () => {
-            subscription.remove();
-            socketService.off(SOCKET_EVENTS.NEW_EMERGENCY);
-            stopLocationTracking();
+            socketService.off('VOLUNTEER_ALERT');
         };
     }, []);
 
-    // Start/Stop Live Location based on Availability
-    useEffect(() => {
-        if (isAvailable) {
-            startLiveLocationTracking();
-        } else {
-            stopLocationTracking();
+    const setupLocation = async () => {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+            setLocationStatus('Location Access Denied');
+            return;
         }
-    }, [isAvailable]);
-
-    // ---------------------------------------------------------------------------
-    // 2. PERMISSIONS & NOTIFICATIONS
-    // ---------------------------------------------------------------------------
-    const setupPermissions = async () => {
-        const { status: locStatus } = await Location.requestForegroundPermissionsAsync();
-        if (locStatus !== 'granted') {
-            Alert.alert('Permission Denied', 'Location access is required to receive nearby emergencies.');
-        }
-
-        // Note: expo-notifications was removed from Expo Go Android SDK 53+. 
-        // Development builds are needed. So we avoid calling Push notifications logic here in Expo Go.
-        // const { status: pushStatus } = await Notifications.requestPermissionsAsync();
-        // if (pushStatus !== 'granted') {
-        //     Alert.alert('Permission Denied', 'Push notifications are important for receiving alerts in the background.');
-        // }
-
-        // Ideally, get ExpoPushTokenAsync and send it to your backend
+        const loc = await Location.getCurrentPositionAsync({});
+        setUserLocation({ lat: loc.coords.latitude, lon: loc.coords.longitude });
+        setLocationStatus('Live GPS Active Tracking');
     };
 
-    // ---------------------------------------------------------------------------
-    // 3. LOCATION TRACKING (Foreground initially, Background if needed)
-    // ---------------------------------------------------------------------------
-    const startLiveLocationTracking = async () => {
+    const fetchNearbyEmergencies = async () => {
         try {
-            locationSubscription.current = await Location.watchPositionAsync(
-                {
-                    accuracy: Location.Accuracy.High,
-                    timeInterval: 5000,
-                    distanceInterval: 10,
-                },
-                (location) => {
-                    // Send location to backend
-                    socketService.emit(SOCKET_EVENTS.LOCATION_UPDATE, {
-                        volunteerId: userId,
-                        lat: location.coords.latitude,
-                        lon: location.coords.longitude,
-                        timestamp: location.timestamp
-                    });
-                }
-            );
-        } catch (error) {
-            console.error('Failed to start location tracking', error);
-        }
-    };
-
-    const stopLocationTracking = () => {
-        if (locationSubscription.current) {
-            locationSubscription.current.remove();
-            locationSubscription.current = null;
-        }
-    };
-
-    // ---------------------------------------------------------------------------
-    // 4. EMERGENCY HANDLING LOGIC & EDGE CASES
-    // ---------------------------------------------------------------------------
-    const handleIncomingEmergency = (emergency: any) => {
-        if (!isAvailable) return;
-
-        // Ensure we don't add duplicates
-        setEmergencies(prev => {
-            if (prev.find(e => e.id === emergency.id)) return prev;
-            return [emergency, ...prev];
-        });
-
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        addToast('New Emergency Alert!', 'warning');
-    };
-
-    const handleAccept = async (emergency: any) => {
-        setProcessingId(emergency.id);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-
-        try {
-            const response = await acceptEmergency(emergency.id, userId);
-
-            // Edge Case: Someone else already accepted it
-            if (response?.error === 'ALREADY_ASSIGNED') {
-                Alert.alert('Missed It', 'Another responder already accepted this emergency.');
-                setEmergencies(prev => prev.filter(e => e.id !== emergency.id));
-                return;
+            // Call our new volunteer geo-matcher endpoint
+            const res = await fetch(`${API_BASE_URL}/volunteer/nearby?lat=18.5204&lon=73.8567&radius=3000`);
+            const data = await res.json();
+            if (data.success) {
+                setNearbyEmergencies(data.emergencies);
             }
-
-            // Success case
-            setCurrentEmergency({ ...emergency, status: 'accepted' });
-            router.push('/volunteer/tracking'); // Navigate to Live Tracking
-
-            // Clean up list
-            setEmergencies(prev => prev.filter(e => e.id !== emergency.id));
-
-        } catch (error) {
-            Alert.alert('Connection Error', 'Please check your internet connection and try again.');
-        } finally {
-            setProcessingId(null);
+        } catch (e) {
+            console.log(e);
         }
     };
 
-    const handleReject = async (emergencyId: string) => {
+    const handleToggle = async (value: boolean) => {
+        setIsAvailable(value);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+        // 🚀 HACKATHON MOCK: Drop in fake nearby emergencies when they go online!
+        if (value) {
+            setTimeout(() => {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                addToast('🚨 EMERGENCY MATCH: Within 3km!', 'error');
+                setNearbyEmergencies([
+                    {
+                        _id: 'mock-emerg-1',
+                        description: 'Severe accident on Highway 48. Immediate first response needed!',
+                        severity: 'critical',
+                        lat: 18.5204,
+                        lon: 73.8567
+                    },
+                    {
+                        _id: 'mock-emerg-2',
+                        description: 'Elderly patient with sudden cardiac chest pain.',
+                        severity: 'high',
+                        lat: 18.5254,
+                        lon: 73.8617
+                    }
+                ]);
+            }, 2000);
+        } else {
+            // Clear mock emergencies if they go offline
+            setNearbyEmergencies([]);
+        }
+
         try {
-            await rejectEmergency(emergencyId, userId);
-        } catch (e) { } // Best effort rejection
-        setEmergencies(prev => prev.filter(e => e.id !== emergencyId));
+            await fetch(`${API_BASE_URL}/volunteer/availability`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId, is_available: value })
+            });
+        } catch (e) {
+            console.log("Mock user data not in DB, bypassing standard API for Hackathon simulation");
+        }
     };
 
-    // ---------------------------------------------------------------------------
-    // 5. RENDER COMPONENTS (Optimized FlatList)
-    // ---------------------------------------------------------------------------
-    const renderEmergencyItem = ({ item }: { item: any }) => (
-        <View style={styles.emergencyCard}>
-            <View style={styles.cardHeader}>
-                <SeverityBadge severity={item.severity || 'high'} />
-                <Text style={styles.distanceText}>{item.distance?.toFixed(1) || '1.2'} km away</Text>
-            </View>
+    const handleAccept = (emerg: any) => {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setActiveEmergency(emerg);
+        setCurrentEmergency(emerg);
+        // Remove from list
+        setNearbyEmergencies(prev => prev.filter(e => e._id !== emerg._id));
+    };
 
-            <Text style={styles.emergencyId}>{item.id}</Text>
-            <Text style={styles.description} numberOfLines={2}>{item.description}</Text>
-
-            <View style={styles.actionRow}>
-                <TouchableOpacity
-                    style={styles.rejectBtn}
-                    onPress={() => handleReject(item.id)}
-                    disabled={processingId !== null}
-                >
-                    <Text style={styles.rejectText}>Decline</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={[styles.acceptBtn, processingId === item.id && styles.disabledBtn]}
-                    onPress={() => handleAccept(item)}
-                    disabled={processingId !== null}
-                >
-                    {processingId === item.id ? (
-                        <LoadingSpinner size={18} color="#FFF" />
-                    ) : (
-                        <Text style={styles.acceptText}>Accept & Respond</Text>
-                    )}
-                </TouchableOpacity>
-            </View>
-        </View>
-    );
+    const handleReject = (emerg: any) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        setNearbyEmergencies(prev => prev.filter(e => e._id !== emerg._id));
+    };
 
     return (
         <View style={styles.container}>
-            {/* Header Area */}
+            {/* Header */}
             <LinearGradient colors={['#F59E0B', '#D97706']} style={styles.header}>
-                <TouchableOpacity onPress={() => router.replace('/')} style={styles.backBtn}>
-                    <Ionicons name="arrow-back" size={24} color="#FFF" />
-                </TouchableOpacity>
-                <View style={{ flex: 1 }}>
-                    <Text style={styles.headerTitle}>Responder Ready</Text>
-                    <Text style={styles.headerSub}>Volunteer ID: {userId}</Text>
+                <View style={styles.headerTop}>
+                    <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+                        <Ionicons name="arrow-back" size={24} color="#FFF" />
+                    </TouchableOpacity>
+                    <View>
+                        <Text style={styles.headerTitle}>Commando Volunteer</Text>
+                        <Text style={styles.headerSub}>PraanSettu Task Force</Text>
+                    </View>
                 </View>
 
-                {/* Availability Toggle */}
-                <View style={styles.toggleContainer}>
-                    <Text style={styles.toggleText}>{isAvailable ? 'ONLINE' : 'OFFLINE'}</Text>
-                    <Switch
-                        value={isAvailable}
-                        onValueChange={(val) => {
-                            setIsAvailable(val);
-                            Haptics.selectionAsync();
-                        }}
-                        trackColor={{ false: 'rgba(255,255,255,0.3)', true: '#10B981' }}
-                        thumbColor="#FFF"
-                    />
+                {/* Profile Card Overlay */}
+                <View style={styles.profileCard}>
+                    <View style={styles.profileHeader}>
+                        <View style={styles.avatar}>
+                            <Ionicons name="person" size={24} color="#F59E0B" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.profileName}>{VOLUNTEER_PROFILE.name}</Text>
+                            <View style={styles.badgeRow}>
+                                <View style={styles.badge}>
+                                    <Ionicons name="medical" size={12} color="#EF4444" />
+                                    <Text style={styles.badgeText}>{VOLUNTEER_PROFILE.bloodGroup}</Text>
+                                </View>
+                                <View style={[styles.badge, { backgroundColor: '#E0E7FF' }]}>
+                                    <Ionicons name="briefcase" size={12} color="#4F46E5" />
+                                    <Text style={[styles.badgeText, { color: '#4F46E5' }]}>{VOLUNTEER_PROFILE.occupation}</Text>
+                                </View>
+                            </View>
+                        </View>
+                        <Switch
+                            value={isAvailable}
+                            onValueChange={handleToggle}
+                            trackColor={{ false: '#CBD5E1', true: '#34D399' }}
+                            thumbColor="#FFF"
+                            ios_backgroundColor="#CBD5E1"
+                        />
+                    </View>
+
+                    {/* Status Bar */}
+                    <View style={styles.statusBar}>
+                        <View style={styles.statusDotWrap}>
+                            <Animated.View style={[styles.statusDotOuter, { backgroundColor: isAvailable ? 'rgba(52,211,153,0.3)' : 'transparent', transform: [{ scale: isAvailable ? pulseAnim : 1 }] }]} />
+                            <View style={[styles.statusDot, { backgroundColor: isAvailable ? '#10B981' : '#94A3B8' }]} />
+                        </View>
+                        <Text style={[styles.statusText, { color: isAvailable ? '#10B981' : '#64748B' }]}>
+                            {isAvailable ? 'Available & Matching...' : 'Currently Offline'}
+                        </Text>
+                    </View>
+
+                    <View style={styles.gpsBar}>
+                        <Ionicons name="location" size={14} color={COLORS.primary} />
+                        <Text style={styles.gpsText}>{locationStatus}</Text>
+                    </View>
                 </View>
             </LinearGradient>
 
-            {/* Main Content Area */}
-            {!isAvailable ? (
-                <View style={styles.offlineState}>
-                    <Ionicons name="moon" size={64} color={COLORS.textMuted} />
-                    <Text style={styles.emptyTitle}>You are Offline</Text>
-                    <Text style={styles.emptySubtitle}>Go online to receive nearby emergency requests.</Text>
-                </View>
-            ) : (
-                <FlatList
-                    data={emergencies}
-                    keyExtractor={item => item.id}
-                    renderItem={renderEmergencyItem}
-                    contentContainerStyle={styles.listContent}
-                    ListEmptyComponent={
-                        <View style={styles.offlineState}>
-                            <Ionicons name="radio" size={64} color={COLORS.accent} />
-                            <Text style={styles.emptyTitle}>Listening for emergencies...</Text>
-                            <Text style={styles.emptySubtitle}>Stay alert. Make sure your volume is up.</Text>
+            <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 100, paddingTop: 90 }}>
+                {activeEmergency ? (
+                    <View style={styles.activeContainer}>
+                        <Text style={styles.sectionTitle}>Currently Assigned</Text>
+                        <View style={styles.activeCard}>
+                            <LinearGradient colors={['#EF4444', '#B91C1C']} style={styles.activeGradient}>
+                                <View style={styles.activeHeader}>
+                                    <Ionicons name="warning" size={24} color="#FFF" />
+                                    <Text style={styles.activeTitle}>Active Rescue</Text>
+                                </View>
+                                <Text style={styles.activeDesc}>{activeEmergency.description}</Text>
+                                <View style={styles.activeMeta}>
+                                    <Ionicons name="location" size={16} color="rgba(255,255,255,0.8)" />
+                                    <Text style={styles.activeDist}>1.2 km away • Follow map directions</Text>
+                                </View>
+                                <TouchableOpacity style={styles.navigateBtn} onPress={() => router.push('/volunteer/tracking')}>
+                                    <Ionicons name="navigate" size={20} color="#B91C1C" />
+                                    <Text style={styles.navigateText}>Open Live Map & Route</Text>
+                                </TouchableOpacity>
+                            </LinearGradient>
                         </View>
-                    }
-                />
-            )}
+                    </View>
+                ) : (
+                    <View>
+                        <Text style={styles.sectionTitle}>Nearby SOS Alerts (3km)</Text>
+                        {nearbyEmergencies.length === 0 ? (
+                            <View style={styles.emptyState}>
+                                <Ionicons name="shield-checkmark" size={64} color={COLORS.border} />
+                                <Text style={styles.emptyText}>No emergencies nearby.</Text>
+                                <Text style={styles.emptySub}>We will alert you immediately and by SMS if an SOS is matched to your location.</Text>
+                            </View>
+                        ) : (
+                            nearbyEmergencies.map((emerg, idx) => (
+                                <View key={idx} style={styles.emergCard}>
+                                    <View style={styles.emergHeader}>
+                                        <SeverityBadge severity={emerg.severity} />
+                                        <Text style={styles.timeText}>Just now</Text>
+                                    </View>
+                                    <Text style={styles.emergDesc}>{emerg.description}</Text>
+                                    <View style={styles.distRow}>
+                                        <Ionicons name="analytics" size={16} color={COLORS.primary} />
+                                        <Text style={styles.distText}>Distance: {(Math.random() * 2 + 0.5).toFixed(1)} km away</Text>
+                                    </View>
+                                    <View style={styles.actionRow}>
+                                        <TouchableOpacity style={[styles.actionBtn, styles.rejectBtn]} onPress={() => handleReject(emerg)}>
+                                            <Text style={styles.rejectText}>Reject</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity style={[styles.actionBtn, styles.acceptBtn]} onPress={() => handleAccept(emerg)}>
+                                            <Ionicons name="checkmark-circle" size={20} color="#FFF" />
+                                            <Text style={styles.acceptText}>Accept task</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            ))
+                        )}
+                    </View>
+                )}
+            </ScrollView>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: COLORS.background },
-    header: { flexDirection: 'row', alignItems: 'center', paddingTop: 56, paddingBottom: 20, paddingHorizontal: SPACING.lg },
-    backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', marginRight: SPACING.sm },
+    header: { paddingTop: 60, paddingHorizontal: SPACING.lg, paddingBottom: 130, borderBottomLeftRadius: 30, borderBottomRightRadius: 30 },
+    headerTop: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.md },
+    backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', marginRight: SPACING.md },
     headerTitle: { fontSize: FONT_SIZES.xl, fontWeight: '800', color: '#FFF' },
-    headerSub: { fontSize: FONT_SIZES.xs, color: 'rgba(255,255,255,0.8)' },
-
-    toggleContainer: { alignItems: 'center' },
-    toggleText: { fontSize: 10, color: '#FFF', fontWeight: 'bold', marginBottom: 2 },
-
-    offlineState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACING.xl },
-    emptyTitle: { fontSize: FONT_SIZES.lg, color: COLORS.textPrimary, fontWeight: '700', marginTop: SPACING.md },
-    emptySubtitle: { fontSize: FONT_SIZES.sm, color: COLORS.textMuted, textAlign: 'center', marginTop: SPACING.xs },
-
-    listContent: { padding: SPACING.lg, gap: SPACING.md },
-    emergencyCard: { backgroundColor: COLORS.surface, borderRadius: BORDER_RADIUS.lg, padding: SPACING.lg, borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.small },
-    cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.sm },
-    distanceText: { fontSize: FONT_SIZES.sm, fontWeight: '700', color: COLORS.accent },
-    emergencyId: { fontSize: FONT_SIZES.xs, color: COLORS.textMuted, marginBottom: 4 },
-    description: { fontSize: FONT_SIZES.md, color: COLORS.textPrimary, fontWeight: '500', marginBottom: SPACING.md, lineHeight: 22 },
-
+    headerSub: { fontSize: FONT_SIZES.sm, color: 'rgba(255,255,255,0.8)' },
+    profileCard: { backgroundColor: '#FFF', borderRadius: BORDER_RADIUS.lg, padding: SPACING.lg, position: 'absolute', bottom: -50, left: SPACING.lg, right: SPACING.lg, ...SHADOWS.medium },
+    profileHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.md },
+    avatar: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center', marginRight: SPACING.md },
+    profileName: { fontSize: FONT_SIZES.md, fontWeight: '700', color: COLORS.textPrimary, marginBottom: 4 },
+    badgeRow: { flexDirection: 'row', gap: 6 },
+    badge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEE2E2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, gap: 4 },
+    badgeText: { fontSize: 10, fontWeight: '700', color: '#EF4444', textTransform: 'uppercase' },
+    statusBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', padding: SPACING.sm, borderRadius: BORDER_RADIUS.md, marginBottom: 8 },
+    statusDotWrap: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center', marginRight: 6 },
+    statusDotOuter: { position: 'absolute', width: 20, height: 20, borderRadius: 10 },
+    statusDot: { width: 10, height: 10, borderRadius: 5 },
+    statusText: { fontSize: FONT_SIZES.sm, fontWeight: '700' },
+    gpsBar: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 4 },
+    gpsText: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, fontWeight: '500' },
+    content: { flex: 1, paddingHorizontal: SPACING.lg },
+    sectionTitle: { fontSize: FONT_SIZES.lg, fontWeight: '800', color: COLORS.textPrimary, marginBottom: SPACING.md },
+    emptyState: { alignItems: 'center', padding: SPACING.xxl, backgroundColor: '#FFF', borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.border, borderStyle: 'dashed' },
+    emptyText: { fontSize: FONT_SIZES.md, fontWeight: '700', color: COLORS.textSecondary, marginTop: SPACING.md },
+    emptySub: { fontSize: FONT_SIZES.sm, color: COLORS.textMuted, textAlign: 'center', marginTop: 8 },
+    activeContainer: { marginBottom: SPACING.xl },
+    activeCard: { borderRadius: BORDER_RADIUS.lg, overflow: 'hidden', ...SHADOWS.medium },
+    activeGradient: { padding: SPACING.xl },
+    activeHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+    activeTitle: { fontSize: FONT_SIZES.lg, fontWeight: '800', color: '#FFF' },
+    activeDesc: { fontSize: FONT_SIZES.md, color: 'rgba(255,255,255,0.9)', marginBottom: SPACING.md, lineHeight: 22 },
+    activeMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: SPACING.lg },
+    activeDist: { fontSize: FONT_SIZES.sm, color: 'rgba(255,255,255,0.9)', fontWeight: '600' },
+    navigateBtn: { backgroundColor: '#FFF', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: SPACING.md, borderRadius: BORDER_RADIUS.md, gap: 8 },
+    navigateText: { color: '#B91C1C', fontWeight: '800', fontSize: FONT_SIZES.sm },
+    emergCard: { backgroundColor: '#FFF', padding: SPACING.lg, borderRadius: BORDER_RADIUS.lg, marginBottom: SPACING.md, borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.small },
+    emergHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.sm },
+    timeText: { fontSize: FONT_SIZES.xs, color: COLORS.textMuted },
+    emergDesc: { fontSize: FONT_SIZES.md, color: COLORS.textPrimary, marginBottom: SPACING.sm, lineHeight: 20 },
+    distRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: SPACING.lg, backgroundColor: COLORS.lowBg, padding: 8, borderRadius: 8, alignSelf: 'flex-start' },
+    distText: { fontSize: FONT_SIZES.xs, color: COLORS.primary, fontWeight: '700' },
     actionRow: { flexDirection: 'row', gap: SPACING.sm },
-    rejectBtn: { flex: 1, paddingVertical: SPACING.md, borderRadius: BORDER_RADIUS.md, borderWidth: 1, borderColor: COLORS.border, alignItems: 'center' },
-    rejectText: { color: COLORS.textSecondary, fontWeight: '700', fontSize: FONT_SIZES.sm },
-    acceptBtn: { flex: 2, paddingVertical: SPACING.md, borderRadius: BORDER_RADIUS.md, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
-    acceptText: { color: '#FFF', fontWeight: '800', fontSize: FONT_SIZES.sm },
-    disabledBtn: { opacity: 0.7 }
+    actionBtn: { flex: 1, padding: 14, borderRadius: BORDER_RADIUS.md, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 },
+    rejectBtn: { backgroundColor: COLORS.surfaceElevated },
+    rejectText: { color: COLORS.textSecondary, fontWeight: '700' },
+    acceptBtn: { backgroundColor: COLORS.success },
+    acceptText: { color: '#FFF', fontWeight: '800' }
 });
